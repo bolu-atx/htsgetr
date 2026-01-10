@@ -1,7 +1,5 @@
+use crate::types::{Format, HtsgetCapabilities, Organization, ServiceInfo, ServiceType};
 use axum::Json;
-use crate::types::{
-    Format, HtsgetCapabilities, Organization, ServiceInfo, ServiceType,
-};
 
 pub async fn service_info() -> Json<ServiceInfo> {
     Json(ServiceInfo {

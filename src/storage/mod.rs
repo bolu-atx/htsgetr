@@ -36,7 +36,8 @@ pub trait Storage: Send + Sync {
     fn data_url(&self, id: &str, format: Format, range: Option<ByteRange>) -> String;
 
     /// Read bytes directly (for small inline responses)
-    async fn read_bytes(&self, id: &str, format: Format, range: Option<ByteRange>) -> Result<Bytes>;
+    async fn read_bytes(&self, id: &str, format: Format, range: Option<ByteRange>)
+    -> Result<Bytes>;
 
     /// Get index file path if available
     async fn index_path(&self, id: &str, format: Format) -> Result<Option<std::path::PathBuf>>;

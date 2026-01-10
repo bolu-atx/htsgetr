@@ -80,7 +80,12 @@ impl Storage for LocalStorage {
         }
     }
 
-    async fn read_bytes(&self, id: &str, format: Format, range: Option<ByteRange>) -> Result<Bytes> {
+    async fn read_bytes(
+        &self,
+        id: &str,
+        format: Format,
+        range: Option<ByteRange>,
+    ) -> Result<Bytes> {
         let path = self.file_path(id, format);
         let mut file = fs::File::open(&path)
             .await

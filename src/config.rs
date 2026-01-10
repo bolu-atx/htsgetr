@@ -41,3 +41,50 @@ impl Config {
             .unwrap_or_else(|| format!("http://{}:{}", self.host, self.port))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_effective_base_url_default() {
+        let config = Config {
+            host: "0.0.0.0".to_string(),
+            port: 8080,
+            base_url: None,
+            data_dir: PathBuf::from("./data"),
+            cors: true,
+            log_level: "info".to_string(),
+            max_payload: 10485760,
+        };
+        assert_eq!(config.effective_base_url(), "http://0.0.0.0:8080");
+    }
+
+    #[test]
+    fn test_effective_base_url_custom() {
+        let config = Config {
+            host: "0.0.0.0".to_string(),
+            port: 8080,
+            base_url: Some("https://example.com/htsget".to_string()),
+            data_dir: PathBuf::from("./data"),
+            cors: true,
+            log_level: "info".to_string(),
+            max_payload: 10485760,
+        };
+        assert_eq!(config.effective_base_url(), "https://example.com/htsget");
+    }
+
+    #[test]
+    fn test_effective_base_url_custom_port() {
+        let config = Config {
+            host: "localhost".to_string(),
+            port: 3000,
+            base_url: None,
+            data_dir: PathBuf::from("./data"),
+            cors: true,
+            log_level: "info".to_string(),
+            max_payload: 10485760,
+        };
+        assert_eq!(config.effective_base_url(), "http://localhost:3000");
+    }
+}

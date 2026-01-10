@@ -1,15 +1,15 @@
+use super::AppState;
+use crate::{
+    Error, Result,
+    types::{
+        DataClass, Format, HtsgetResponse, HtsgetResponseBody, Region, UrlEntry, VariantsPostBody,
+        VariantsQuery,
+    },
+};
 use axum::{
     Json,
     extract::{Path, Query, State},
 };
-use crate::{
-    Error, Result,
-    types::{
-        DataClass, Format, HtsgetResponse, HtsgetResponseBody,
-        Region, UrlEntry, VariantsPostBody, VariantsQuery,
-    },
-};
-use super::AppState;
 
 pub async fn get_variants(
     State(state): State<AppState>,
@@ -19,7 +19,10 @@ pub async fn get_variants(
     let format = query.format.unwrap_or(Format::Vcf);
 
     if !format.is_variants() {
-        return Err(Error::UnsupportedFormat(format!("{:?} is not a variants format", format)));
+        return Err(Error::UnsupportedFormat(format!(
+            "{:?} is not a variants format",
+            format
+        )));
     }
 
     if !state.storage.exists(&id, format).await? {
@@ -47,7 +50,10 @@ pub async fn post_variants(
     let format = body.format.unwrap_or(Format::Vcf);
 
     if !format.is_variants() {
-        return Err(Error::UnsupportedFormat(format!("{:?} is not a variants format", format)));
+        return Err(Error::UnsupportedFormat(format!(
+            "{:?} is not a variants format",
+            format
+        )));
     }
 
     if !state.storage.exists(&id, format).await? {

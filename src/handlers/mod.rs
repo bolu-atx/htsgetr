@@ -1,14 +1,14 @@
-mod reads;
-mod variants;
-mod sequences;
 mod data;
+mod reads;
+mod sequences;
 mod service_info;
+mod variants;
 
-pub use reads::{get_reads, post_reads};
-pub use variants::{get_variants, post_variants};
-pub use sequences::{get_sequences};
 pub use data::get_data;
+pub use reads::{get_reads, post_reads};
+pub use sequences::get_sequences;
 pub use service_info::service_info;
+pub use variants::{get_variants, post_variants};
 
 use crate::storage::Storage;
 use std::sync::Arc;

@@ -1,13 +1,13 @@
+use super::AppState;
+use crate::{
+    Error, Result,
+    types::{Format, HtsgetResponse, HtsgetResponseBody, UrlEntry},
+};
 use axum::{
     Json,
     extract::{Path, Query, State},
 };
 use serde::Deserialize;
-use crate::{
-    Error, Result,
-    types::{Format, HtsgetResponse, HtsgetResponseBody, UrlEntry},
-};
-use super::AppState;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct SequencesQuery {
@@ -27,7 +27,10 @@ pub async fn get_sequences(
     let format = query.format.unwrap_or(Format::Fasta);
 
     if !format.is_sequences() {
-        return Err(Error::UnsupportedFormat(format!("{:?} is not a sequence format", format)));
+        return Err(Error::UnsupportedFormat(format!(
+            "{:?} is not a sequence format",
+            format
+        )));
     }
 
     if !state.storage.exists(&id, format).await? {

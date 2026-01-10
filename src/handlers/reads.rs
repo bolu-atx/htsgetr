@@ -1,15 +1,15 @@
+use super::AppState;
+use crate::{
+    Error, Result,
+    types::{
+        DataClass, Format, HtsgetResponse, HtsgetResponseBody, ReadsPostBody, ReadsQuery, Region,
+        UrlEntry,
+    },
+};
 use axum::{
     Json,
     extract::{Path, Query, State},
 };
-use crate::{
-    Error, Result,
-    types::{
-        DataClass, Format, HtsgetResponse, HtsgetResponseBody,
-        ReadsPostBody, ReadsQuery, Region, UrlEntry,
-    },
-};
-use super::AppState;
 
 pub async fn get_reads(
     State(state): State<AppState>,
@@ -19,7 +19,10 @@ pub async fn get_reads(
     let format = query.format.unwrap_or(Format::Bam);
 
     if !format.is_reads() {
-        return Err(Error::UnsupportedFormat(format!("{:?} is not a reads format", format)));
+        return Err(Error::UnsupportedFormat(format!(
+            "{:?} is not a reads format",
+            format
+        )));
     }
 
     // Check file exists
@@ -48,7 +51,10 @@ pub async fn post_reads(
     let format = body.format.unwrap_or(Format::Bam);
 
     if !format.is_reads() {
-        return Err(Error::UnsupportedFormat(format!("{:?} is not a reads format", format)));
+        return Err(Error::UnsupportedFormat(format!(
+            "{:?} is not a reads format",
+            format
+        )));
     }
 
     if !state.storage.exists(&id, format).await? {

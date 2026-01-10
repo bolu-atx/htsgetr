@@ -1,18 +1,15 @@
-use crate::{Result, Error};
+use super::IndexedRanges;
 use crate::storage::ByteRange;
 use crate::types::Region;
-use super::IndexedRanges;
-use std::path::Path;
+use crate::{Error, Result};
 use noodles::tabix;
+use std::path::Path;
 
 pub struct VcfIndexReader;
 
 impl VcfIndexReader {
     /// Read tabix index and compute byte ranges for given regions
-    pub async fn query_ranges(
-        index_path: &Path,
-        _regions: &[Region],
-    ) -> Result<IndexedRanges> {
+    pub async fn query_ranges(index_path: &Path, _regions: &[Region]) -> Result<IndexedRanges> {
         // Read the tabix index
         let _index = tabix::r#async::read(index_path)
             .await
@@ -22,7 +19,10 @@ impl VcfIndexReader {
         // Similar to BAM, we need to map reference names and query chunks
 
         Ok(IndexedRanges {
-            header_range: ByteRange { start: 0, end: Some(65536) },
+            header_range: ByteRange {
+                start: 0,
+                end: Some(65536),
+            },
             data_ranges: vec![],
         })
     }

@@ -7,11 +7,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use htsgetr::{
     Config,
     handlers::{
-        AppState,
-        get_reads, post_reads,
-        get_variants, post_variants,
-        get_sequences,
-        get_data,
+        AppState, get_data, get_reads, get_sequences, get_variants, post_reads, post_variants,
         service_info,
     },
     storage::LocalStorage,
@@ -23,8 +19,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize tracing
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| config.log_level.clone().into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| config.log_level.clone().into()),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 

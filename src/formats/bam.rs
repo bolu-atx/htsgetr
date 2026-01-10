@@ -1,18 +1,15 @@
-use crate::{Result, Error};
+use super::IndexedRanges;
 use crate::storage::ByteRange;
 use crate::types::Region;
-use super::IndexedRanges;
-use std::path::Path;
+use crate::{Error, Result};
 use noodles::csi;
+use std::path::Path;
 
 pub struct BamIndexReader;
 
 impl BamIndexReader {
     /// Read BAI index and compute byte ranges for given regions
-    pub async fn query_ranges(
-        index_path: &Path,
-        _regions: &[Region],
-    ) -> Result<IndexedRanges> {
+    pub async fn query_ranges(index_path: &Path, _regions: &[Region]) -> Result<IndexedRanges> {
         // Read the BAI index
         let _index = csi::r#async::read(index_path)
             .await
@@ -23,7 +20,10 @@ impl BamIndexReader {
         // For now, return a placeholder indicating we need the whole file
 
         Ok(IndexedRanges {
-            header_range: ByteRange { start: 0, end: Some(65536) }, // Approximate header size
+            header_range: ByteRange {
+                start: 0,
+                end: Some(65536),
+            }, // Approximate header size
             data_ranges: vec![], // Empty means we need the whole file
         })
     }

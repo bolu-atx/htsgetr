@@ -1,13 +1,13 @@
+use super::AppState;
+use crate::storage::ByteRange;
+use crate::{Error, Result, types::Format};
 use axum::{
     body::Body,
     extract::{Path, Query, State},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::Response,
 };
 use serde::Deserialize;
-use crate::{Error, Result, types::Format};
-use crate::storage::ByteRange;
-use super::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct DataQuery {
