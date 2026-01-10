@@ -1,7 +1,41 @@
+//! Error types for the htsget protocol.
+//!
+//! This module defines error types that map directly to the htsget specification's
+//! error response format. All errors are automatically converted to appropriate
+//! HTTP responses with JSON bodies.
+//!
+//! # Error Types
+//!
+//! The htsget spec defines these error types:
+//!
+//! | Error | HTTP Status | Description |
+//! |-------|-------------|-------------|
+//! | `InvalidAuthentication` | 401 | Missing/invalid auth token |
+//! | `PermissionDenied` | 403 | Valid auth but no access |
+//! | `NotFound` | 404 | Resource doesn't exist |
+//! | `PayloadTooLarge` | 413 | Request exceeds limits |
+//! | `UnsupportedFormat` | 400 | Requested format unavailable |
+//! | `InvalidInput` | 400 | Malformed request |
+//! | `InvalidRange` | 400 | Invalid genomic coordinates |
+//!
+//! # Response Format
+//!
+//! Errors are serialized as:
+//!
+//! ```json
+//! {
+//!   "htsget": {
+//!     "error": "NotFound",
+//!     "message": "not found: sample1"
+//!   }
+//! }
+//! ```
+
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 
+/// Result type alias using [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]

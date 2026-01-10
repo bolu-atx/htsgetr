@@ -1,3 +1,26 @@
+//! Storage backend abstraction for genomic data files.
+//!
+//! This module provides a trait-based abstraction for accessing genomic data files,
+//! allowing different storage backends (local filesystem, S3, GCS, etc.) to be used
+//! interchangeably.
+//!
+//! # Implementations
+//!
+//! - [`LocalStorage`] - Local filesystem storage
+//!
+//! # Example
+//!
+//! ```no_run
+//! use htsgetr::storage::{Storage, LocalStorage};
+//! use htsgetr::types::Format;
+//! use std::path::PathBuf;
+//!
+//! let storage = LocalStorage::new(
+//!     PathBuf::from("./data"),
+//!     "http://localhost:8080".to_string(),
+//! );
+//! ```
+
 mod local;
 
 pub use local::LocalStorage;

@@ -1,3 +1,31 @@
+//! Server configuration and CLI arguments.
+//!
+//! This module provides the [`Config`] struct which handles both CLI argument
+//! parsing and environment variable configuration using [clap](https://docs.rs/clap).
+//!
+//! # Example
+//!
+//! ```no_run
+//! use htsgetr::Config;
+//! use clap::Parser;
+//!
+//! let config = Config::parse();
+//! println!("Serving from: {:?}", config.data_dir);
+//! ```
+//!
+//! # Environment Variables
+//!
+//! All options can be set via environment variables:
+//!
+//! | Variable | Default | Description |
+//! |----------|---------|-------------|
+//! | `HTSGET_HOST` | `0.0.0.0` | Bind address |
+//! | `HTSGET_PORT` | `8080` | Listen port |
+//! | `HTSGET_DATA_DIR` | `./data` | Data directory |
+//! | `HTSGET_BASE_URL` | auto | Base URL for tickets |
+//! | `HTSGET_CORS` | `true` | Enable CORS |
+//! | `RUST_LOG` | `info` | Log level |
+
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -13,7 +41,7 @@ pub struct Config {
     #[arg(short, long, env = "HTSGET_PORT", default_value = "8080")]
     pub port: u16,
 
-    /// Base URL for ticket URLs (e.g., https://example.com)
+    /// Base URL for ticket URLs (e.g., `https://example.com`)
     #[arg(long, env = "HTSGET_BASE_URL")]
     pub base_url: Option<String>,
 
@@ -35,6 +63,10 @@ pub struct Config {
 }
 
 impl Config {
+    /// Returns the effective base URL for ticket responses.
+    ///
+    /// If `base_url` is set, returns that value. Otherwise, constructs
+    /// a URL from the host and port (e.g., `http://0.0.0.0:8080`).
     pub fn effective_base_url(&self) -> String {
         self.base_url
             .clone()

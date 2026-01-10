@@ -1,6 +1,28 @@
+//! Request and response types for the htsget protocol.
+//!
+//! This module contains all the data types defined by the htsget 1.3 specification,
+//! including request parameters, response structures, and format enumerations.
+//!
+//! # Response Types
+//!
+//! - [`HtsgetResponse`] - Top-level response wrapper
+//! - [`HtsgetResponseBody`] - Response body with format and URLs
+//! - [`UrlEntry`] - Individual data block URL
+//!
+//! # Request Types
+//!
+//! - [`ReadsQuery`] / [`ReadsPostBody`] - Parameters for reads endpoint
+//! - [`VariantsQuery`] / [`VariantsPostBody`] - Parameters for variants endpoint
+//! - [`Region`] - Genomic region specification
+//!
+//! # Formats
+//!
+//! - [`Format`] - Data format enum (BAM, CRAM, VCF, BCF, FASTA, FASTQ)
+//! - [`DataClass`] - Data class (header or body)
+
 use serde::{Deserialize, Serialize};
 
-/// htsget response format per spec 1.3
+/// htsget response format per spec 1.3.
 #[derive(Debug, Serialize)]
 pub struct HtsgetResponse {
     pub htsget: HtsgetResponseBody,
