@@ -18,7 +18,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install htslib tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y samtools bcftools tabix
+
+      - name: Generate test data
+        run: ./scripts/generate-test-data.sh
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -51,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -84,7 +92,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
         uses: actions/cache@v4

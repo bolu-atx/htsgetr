@@ -10,6 +10,7 @@
 //! - [`BcfIndexReader`] - BCF index files (`.csi`)
 //! - [`CramIndexReader`] - CRAM index files (`.crai`)
 //! - [`FastaIndexReader`] - FASTA index files (`.fai`)
+//! - [`FastqIndexReader`] - FASTQ files (no index, returns whole file)
 //!
 //! # Index-Based Queries
 //!
@@ -21,12 +22,14 @@ mod bam;
 mod bcf;
 mod cram;
 mod fasta;
+mod fastq;
 mod vcf;
 
 pub use bam::BamIndexReader;
 pub use bcf::BcfIndexReader;
 pub use cram::CramIndexReader;
 pub use fasta::FastaIndexReader;
+pub use fastq::FastqIndexReader;
 pub use vcf::VcfIndexReader;
 
 use crate::storage::ByteRange;

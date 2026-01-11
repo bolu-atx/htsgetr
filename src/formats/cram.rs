@@ -9,6 +9,7 @@ use noodles::cram::crai;
 use noodles::sam;
 use std::path::Path;
 use tokio::fs::File;
+use tokio::io::AsyncSeekExt;
 
 pub struct CramIndexReader;
 
@@ -124,8 +125,7 @@ impl CramIndexReader {
     }
 
     /// Compute the header byte range for CRAM
-    /// CRAM files have a file definition (26 bytes) followed by containers
-    /// The first container is typically the header container
+    /// CRAM files have a file definition (26 bytes) followed by the header container
     pub async fn header_range(cram_path: &Path) -> Result<ByteRange> {
         let file = File::open(cram_path)
             .await
@@ -145,12 +145,15 @@ impl CramIndexReader {
             .await
             .map_err(|e| Error::Internal(format!("failed to read CRAM header: {}", e)))?;
 
-        // The position after header container
-        // This is approximate - we'd need to track the actual byte position
-        // For now, return a reasonable estimate based on typical header sizes
+        // Get actual byte position after reading header
+        let header_end =
+            reader.get_mut().stream_position().await.map_err(|e| {
+                Error::Internal(format!("failed to get CRAM header position: {}", e))
+            })?;
+
         Ok(ByteRange {
             start: 0,
-            end: Some(65536), // Conservative estimate
+            end: Some(header_end),
         })
     }
 

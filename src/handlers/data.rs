@@ -13,6 +13,8 @@ use serde::Deserialize;
 pub struct DataQuery {
     pub start: Option<u64>,
     pub end: Option<u64>,
+    /// Explicit format override (BAM, CRAM, VCF, BCF, FASTA, FASTQ)
+    pub format: Option<Format>,
 }
 
 /// Serve raw data blocks - this is what the ticket URLs point to
@@ -21,7 +23,11 @@ pub async fn get_data(
     Path((format_str, id)): Path<(String, String)>,
     Query(query): Query<DataQuery>,
 ) -> Result<Response> {
-    let format = parse_format(&format_str)?;
+    // Use explicit format if provided, otherwise infer from path
+    let format = match query.format {
+        Some(f) => f,
+        None => parse_format(&format_str)?,
+    };
 
     if !state.storage.exists(&id, format).await? {
         return Err(Error::NotFound(id));
