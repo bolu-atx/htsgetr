@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [features]
 default = []
-python = ["pyo3"]
+python = ["pyo3", "ureq"]
 
 [dependencies]
 # Web framework
@@ -71,5 +71,10 @@ async-trait = "0.1"
 # Python bindings (optional)
 pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
 
+# HTTP client for Python bindings (optional)
+ureq = { version = "2", optional = true }
+
 [dev-dependencies]
 tempfile = "3"
+axum-test = "16"
+serde_json = "1"

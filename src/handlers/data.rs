@@ -32,16 +32,37 @@ pub async fn get_data(
         _ => None,
     };
 
-    let bytes = state.storage.read_bytes(&id, format, range).await?;
+    let bytes = state.storage.read_bytes(&id, format, range.clone()).await?;
 
-    let response = Response::builder()
-        .status(StatusCode::OK)
+    // Determine response status and headers based on whether range was requested
+    let (status, content_range) = if let Some(ref r) = range {
+        // Get total file size for Content-Range header
+        let file_info = state.storage.file_info(&id, format).await?;
+        let total_size = file_info.size;
+
+        // Calculate actual byte range returned
+        let start = r.start;
+        let actual_end = start + bytes.len() as u64;
+
+        // Content-Range: bytes start-end/total
+        let content_range = format!("bytes {}-{}/{}", start, actual_end - 1, total_size);
+
+        (StatusCode::PARTIAL_CONTENT, Some(content_range))
+    } else {
+        (StatusCode::OK, None)
+    };
+
+    let mut builder = Response::builder()
+        .status(status)
         .header(header::CONTENT_TYPE, format.content_type())
         .header(header::CONTENT_LENGTH, bytes.len())
-        .body(Body::from(bytes))
-        .unwrap();
+        .header(header::ACCEPT_RANGES, "bytes");
 
-    Ok(response)
+    if let Some(cr) = content_range {
+        builder = builder.header(header::CONTENT_RANGE, cr);
+    }
+
+    Ok(builder.body(Body::from(bytes)).unwrap())
 }
 
 fn parse_format(s: &str) -> Result<Format> {

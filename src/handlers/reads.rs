@@ -1,6 +1,7 @@
 use super::AppState;
 use crate::{
     Error, Result,
+    formats::BamIndexReader,
     types::{
         DataClass, Format, HtsgetResponse, HtsgetResponseBody, ReadsPostBody, ReadsQuery, Region,
         UrlEntry,
@@ -16,7 +17,10 @@ pub async fn get_reads(
     Path(id): Path<String>,
     Query(query): Query<ReadsQuery>,
 ) -> Result<Json<HtsgetResponse>> {
+    tracing::debug!("get_reads: id={}, query={:?}", id, query);
+
     let format = query.format.unwrap_or(Format::Bam);
+    tracing::debug!("get_reads: format={:?}", format);
 
     if !format.is_reads() {
         return Err(Error::UnsupportedFormat(format!(
@@ -26,6 +30,13 @@ pub async fn get_reads(
     }
 
     // Check file exists
+    let file_path = state.storage.file_path(&id, format);
+    tracing::debug!(
+        "get_reads: file_path={:?}, exists={}",
+        file_path,
+        file_path.exists()
+    );
+
     if !state.storage.exists(&id, format).await? {
         return Err(Error::NotFound(id));
     }
@@ -75,32 +86,74 @@ async fn build_reads_response(
     regions: &[Region],
 ) -> Result<Json<HtsgetResponse>> {
     let mut urls = Vec::new();
+    let bam_path = state.storage.file_path(id, format);
 
     match class {
         DataClass::Header => {
             // Return only the header block
+            let header_range = BamIndexReader::header_range(&bam_path).await?;
             urls.push(UrlEntry {
-                url: state.storage.data_url(id, format, None),
+                url: state.storage.data_url(id, format, Some(header_range)),
                 headers: None,
                 class: Some(DataClass::Header),
             });
         }
         DataClass::Body => {
             if regions.is_empty() {
-                // Return entire file
+                // No regions - return entire file
                 urls.push(UrlEntry {
                     url: state.storage.data_url(id, format, None),
                     headers: None,
                     class: None,
                 });
             } else {
-                // TODO: Use index to compute byte ranges for each region
-                // For now, return the whole file (inefficient but correct)
-                urls.push(UrlEntry {
-                    url: state.storage.data_url(id, format, None),
-                    headers: None,
-                    class: None,
-                });
+                // Check if index is available
+                let index_path = state.storage.index_path(id, format).await?;
+
+                if let Some(idx_path) = index_path {
+                    // Read header for reference name mapping
+                    let header = BamIndexReader::read_header(&bam_path).await?;
+
+                    // Query index for byte ranges
+                    let indexed =
+                        BamIndexReader::query_ranges(&bam_path, &idx_path, regions, &header)
+                            .await?;
+
+                    // Add header block first
+                    urls.push(UrlEntry {
+                        url: state
+                            .storage
+                            .data_url(id, format, Some(indexed.header_range)),
+                        headers: None,
+                        class: Some(DataClass::Header),
+                    });
+
+                    // Add data blocks
+                    if indexed.data_ranges.is_empty() {
+                        // Index query returned no specific ranges - return whole file body
+                        // This shouldn't happen if index was properly queried
+                        urls.push(UrlEntry {
+                            url: state.storage.data_url(id, format, None),
+                            headers: None,
+                            class: Some(DataClass::Body),
+                        });
+                    } else {
+                        for range in indexed.data_ranges {
+                            urls.push(UrlEntry {
+                                url: state.storage.data_url(id, format, Some(range)),
+                                headers: None,
+                                class: Some(DataClass::Body),
+                            });
+                        }
+                    }
+                } else {
+                    // No index available - return whole file
+                    urls.push(UrlEntry {
+                        url: state.storage.data_url(id, format, None),
+                        headers: None,
+                        class: None,
+                    });
+                }
             }
         }
     }

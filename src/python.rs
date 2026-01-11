@@ -8,6 +8,9 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use std::path::PathBuf;
 
+#[cfg(feature = "python")]
+use std::sync::Arc;
+
 /// Python module for htsgetr
 #[cfg(feature = "python")]
 #[pymodule]
@@ -41,18 +44,47 @@ impl HtsgetServer {
 
     /// Start the server (blocking)
     fn run(&self) -> PyResult<()> {
+        use tower_http::{cors::CorsLayer, trace::TraceLayer};
+
+        use crate::handlers::{AppState, create_router};
+        use crate::storage::LocalStorage;
+
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
 
         let host = self.host.clone();
         let port = self.port;
         let data_dir = self.data_dir.clone();
+        let base_url = format!("http://{}:{}", host, port);
 
         rt.block_on(async move {
-            // TODO: Implement server startup
-            tracing::info!("Starting server on {}:{}", host, port);
+            // Initialize tracing (basic)
+            let _ = tracing_subscriber::fmt::try_init();
+
+            // Create storage backend
+            let storage = Arc::new(LocalStorage::new(data_dir.clone(), base_url.clone()));
+
+            let state = AppState {
+                storage,
+                base_url: base_url.clone(),
+            };
+
+            // Build router using centralized definition
+            let app = create_router(state)
+                .layer(TraceLayer::new_for_http())
+                .layer(CorsLayer::permissive());
+
+            let addr = format!("{}:{}", host, port);
+            tracing::info!("Starting htsgetr server on {}", addr);
             tracing::info!("Data directory: {:?}", data_dir);
-            Ok(())
+
+            let listener = tokio::net::TcpListener::bind(&addr)
+                .await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+            axum::serve(listener, app)
+                .await
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
         })
     }
 
@@ -87,11 +119,7 @@ impl HtsgetClient {
         end: Option<u64>,
         format: Option<String>,
     ) -> PyResult<String> {
-        // TODO: Implement actual HTTP request
-        Ok(format!(
-            "{{\"htsget\": {{\"format\": \"{}\", \"urls\": []}}}}",
-            format.unwrap_or_else(|| "BAM".to_string())
-        ))
+        self.fetch_endpoint("reads", id, reference_name, start, end, format)
     }
 
     /// Fetch variants for a given ID
@@ -104,10 +132,49 @@ impl HtsgetClient {
         end: Option<u64>,
         format: Option<String>,
     ) -> PyResult<String> {
-        // TODO: Implement actual HTTP request
-        Ok(format!(
-            "{{\"htsget\": {{\"format\": \"{}\", \"urls\": []}}}}",
-            format.unwrap_or_else(|| "VCF".to_string())
-        ))
+        self.fetch_endpoint("variants", id, reference_name, start, end, format)
+    }
+}
+
+#[cfg(feature = "python")]
+impl HtsgetClient {
+    fn fetch_endpoint(
+        &self,
+        endpoint: &str,
+        id: String,
+        reference_name: Option<String>,
+        start: Option<u64>,
+        end: Option<u64>,
+        format: Option<String>,
+    ) -> PyResult<String> {
+        // Build URL with query parameters
+        let mut url = format!("{}/{}/{}", self.base_url, endpoint, id);
+        let mut params = Vec::new();
+
+        if let Some(fmt) = format {
+            params.push(format!("format={}", fmt));
+        }
+        if let Some(ref_name) = reference_name {
+            params.push(format!("referenceName={}", ref_name));
+        }
+        if let Some(s) = start {
+            params.push(format!("start={}", s));
+        }
+        if let Some(e) = end {
+            params.push(format!("end={}", e));
+        }
+
+        if !params.is_empty() {
+            url = format!("{}?{}", url, params.join("&"));
+        }
+
+        // Make HTTP request using ureq
+        let response = ureq::get(&url).call().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("HTTP request failed: {}", e))
+        })?;
+
+        response.into_string().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to read response: {}", e))
+        })
     }
 }

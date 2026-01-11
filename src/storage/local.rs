@@ -16,7 +16,7 @@ impl LocalStorage {
         Self { data_dir, base_url }
     }
 
-    fn file_path(&self, id: &str, format: Format) -> PathBuf {
+    fn make_file_path(&self, id: &str, format: Format) -> PathBuf {
         let ext = match format {
             Format::Bam => "bam",
             Format::Cram => "cram",
@@ -43,19 +43,21 @@ impl LocalStorage {
 #[async_trait]
 impl Storage for LocalStorage {
     async fn exists(&self, id: &str, format: Format) -> Result<bool> {
-        let path = self.file_path(id, format);
+        let path = self.make_file_path(id, format);
         Ok(path.exists())
     }
 
     async fn file_info(&self, id: &str, format: Format) -> Result<FileInfo> {
-        let path = self.file_path(id, format);
+        let path = self.make_file_path(id, format);
         let metadata = fs::metadata(&path)
             .await
             .map_err(|_| Error::NotFound(id.to_string()))?;
 
         let has_index = if let Some(idx_ext) = Self::index_extension(format) {
-            let idx_path = path.with_extension(idx_ext);
-            idx_path.exists()
+            // Check both appended (file.bam.bai) and replaced (file.bai) conventions
+            let appended_idx = PathBuf::from(format!("{}.{}", path.display(), idx_ext));
+            let replaced_idx = path.with_extension(idx_ext);
+            appended_idx.exists() || replaced_idx.exists()
         } else {
             false
         };
@@ -86,7 +88,7 @@ impl Storage for LocalStorage {
         format: Format,
         range: Option<ByteRange>,
     ) -> Result<Bytes> {
-        let path = self.file_path(id, format);
+        let path = self.make_file_path(id, format);
         let mut file = fs::File::open(&path)
             .await
             .map_err(|_| Error::NotFound(id.to_string()))?;
@@ -111,14 +113,25 @@ impl Storage for LocalStorage {
     }
 
     async fn index_path(&self, id: &str, format: Format) -> Result<Option<PathBuf>> {
-        let path = self.file_path(id, format);
+        let path = self.make_file_path(id, format);
         if let Some(idx_ext) = Self::index_extension(format) {
-            let idx_path = path.with_extension(idx_ext);
-            if idx_path.exists() {
-                return Ok(Some(idx_path));
+            // Try appended index first (e.g., file.bam.bai)
+            let appended_idx = PathBuf::from(format!("{}.{}", path.display(), idx_ext));
+            if appended_idx.exists() {
+                return Ok(Some(appended_idx));
+            }
+
+            // Try replaced extension (e.g., file.bai)
+            let replaced_idx = path.with_extension(idx_ext);
+            if replaced_idx.exists() {
+                return Ok(Some(replaced_idx));
             }
         }
         Ok(None)
+    }
+
+    fn file_path(&self, id: &str, format: Format) -> PathBuf {
+        self.make_file_path(id, format)
     }
 }
 

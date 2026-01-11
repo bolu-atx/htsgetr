@@ -1,12 +1,15 @@
 //! Format-specific index readers using noodles.
 //!
-//! This module provides readers for genomic index files (BAI, TBI, CSI)
+//! This module provides readers for genomic index files (BAI, TBI, CSI, CRAI, FAI)
 //! that enable efficient byte-range queries for htsget responses.
 //!
 //! # Supported Formats
 //!
 //! - [`BamIndexReader`] - BAM index files (`.bai`, `.csi`)
-//! - [`VcfIndexReader`] - VCF/BCF index files (`.tbi`, `.csi`)
+//! - [`VcfIndexReader`] - VCF index files (`.tbi`, `.csi`)
+//! - [`BcfIndexReader`] - BCF index files (`.csi`)
+//! - [`CramIndexReader`] - CRAM index files (`.crai`)
+//! - [`FastaIndexReader`] - FASTA index files (`.fai`)
 //!
 //! # Index-Based Queries
 //!
@@ -15,9 +18,15 @@
 //! byte offsets using the index files.
 
 mod bam;
+mod bcf;
+mod cram;
+mod fasta;
 mod vcf;
 
 pub use bam::BamIndexReader;
+pub use bcf::BcfIndexReader;
+pub use cram::CramIndexReader;
+pub use fasta::FastaIndexReader;
 pub use vcf::VcfIndexReader;
 
 use crate::storage::ByteRange;

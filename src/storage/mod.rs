@@ -64,4 +64,9 @@ pub trait Storage: Send + Sync {
 
     /// Get index file path if available
     async fn index_path(&self, id: &str, format: Format) -> Result<Option<std::path::PathBuf>>;
+
+    /// Get the actual file path for direct access
+    /// For local storage, returns the local path.
+    /// For remote storage, may download to a temp file and return that path.
+    fn file_path(&self, id: &str, format: Format) -> std::path::PathBuf;
 }

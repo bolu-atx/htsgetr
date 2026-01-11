@@ -2,32 +2,32 @@ use super::IndexedRanges;
 use crate::storage::ByteRange;
 use crate::types::Region;
 use crate::{Error, Result};
+use noodles::bcf;
 use noodles::bgzf;
 use noodles::core::Position;
 use noodles::core::region::Interval;
+use noodles::csi;
 use noodles::csi::binning_index::BinningIndex;
 use noodles::csi::binning_index::index::reference_sequence::bin::Chunk;
-use noodles::tabix;
-use noodles::vcf;
 use std::path::Path;
 use tokio::fs::File;
 
-pub struct VcfIndexReader;
+pub struct BcfIndexReader;
 
-impl VcfIndexReader {
-    /// Read tabix index and compute byte ranges for given regions
+impl BcfIndexReader {
+    /// Read CSI index and compute byte ranges for given regions
     pub async fn query_ranges(
-        vcf_path: &Path,
+        bcf_path: &Path,
         index_path: &Path,
         regions: &[Region],
     ) -> Result<IndexedRanges> {
-        // Read the tabix index
-        let index = tabix::r#async::read(index_path)
+        // Read the CSI index
+        let index = csi::r#async::read(index_path)
             .await
-            .map_err(|e| Error::Internal(format!("failed to read tabix index: {}", e)))?;
+            .map_err(|e| Error::Internal(format!("failed to read CSI index: {}", e)))?;
 
         // Compute header byte range
-        let header_range = Self::header_range(vcf_path).await?;
+        let header_range = Self::header_range(bcf_path).await?;
 
         // If no regions specified, return empty data_ranges (caller should serve whole file)
         if regions.is_empty() {
@@ -37,20 +37,17 @@ impl VcfIndexReader {
             });
         }
 
-        // Get reference sequence names from tabix header
-        let tabix_header = index.header().ok_or_else(|| {
-            Error::Internal("tabix index missing header with reference names".to_string())
-        })?;
-        let ref_names = tabix_header.reference_sequence_names();
+        // Read header to get reference sequence mapping
+        let header = Self::read_header(bcf_path).await?;
 
         // Query index for each region
         let mut chunks: Vec<Chunk> = Vec::new();
 
         for region in regions {
-            // Map reference name to reference sequence ID
-            let ref_id = ref_names
-                .iter()
-                .position(|name| name == &region.reference_name)
+            // Map reference name to reference sequence ID using header contigs
+            let ref_id = header
+                .contigs()
+                .get_index_of(&region.reference_name)
                 .ok_or_else(|| {
                     Error::NotFound(format!(
                         "reference sequence not found: {}",
@@ -59,7 +56,6 @@ impl VcfIndexReader {
                 })?;
 
             // Build interval from region coordinates
-            // htsget uses 0-based half-open coordinates, noodles uses 1-based closed
             let start = region
                 .start
                 .map(|s| Position::try_from(s as usize + 1))
@@ -93,7 +89,7 @@ impl VcfIndexReader {
             })
             .collect();
 
-        // Merge overlapping/adjacent ranges for efficiency
+        // Merge overlapping/adjacent ranges
         data_ranges = Self::merge_ranges(data_ranges);
 
         Ok(IndexedRanges {
@@ -102,19 +98,19 @@ impl VcfIndexReader {
         })
     }
 
-    /// Compute the header byte range by reading the VCF file
-    pub async fn header_range(vcf_path: &Path) -> Result<ByteRange> {
-        let file = File::open(vcf_path)
+    /// Compute the header byte range by reading the BCF file
+    pub async fn header_range(bcf_path: &Path) -> Result<ByteRange> {
+        let file = File::open(bcf_path)
             .await
-            .map_err(|e| Error::Internal(format!("failed to open VCF file: {}", e)))?;
+            .map_err(|e| Error::Internal(format!("failed to open BCF file: {}", e)))?;
 
-        let mut reader = vcf::r#async::io::Reader::new(bgzf::r#async::Reader::new(file));
+        let mut reader = bcf::r#async::io::Reader::new(bgzf::r#async::Reader::new(file));
 
         // Read header to advance position past it
         reader
             .read_header()
             .await
-            .map_err(|e| Error::Internal(format!("failed to read VCF header: {}", e)))?;
+            .map_err(|e| Error::Internal(format!("failed to read BCF header: {}", e)))?;
 
         // Get the virtual position after the header
         let header_end = reader.get_ref().virtual_position();
@@ -123,6 +119,20 @@ impl VcfIndexReader {
             start: 0,
             end: Some(header_end.compressed()),
         })
+    }
+
+    /// Read the BCF header
+    pub async fn read_header(bcf_path: &Path) -> Result<noodles::vcf::Header> {
+        let file = File::open(bcf_path)
+            .await
+            .map_err(|e| Error::Internal(format!("failed to open BCF file: {}", e)))?;
+
+        let mut reader = bcf::r#async::io::Reader::new(bgzf::r#async::Reader::new(file));
+
+        reader
+            .read_header()
+            .await
+            .map_err(|e| Error::Internal(format!("failed to read BCF header: {}", e)))
     }
 
     /// Merge overlapping or adjacent byte ranges
@@ -140,7 +150,7 @@ impl VcfIndexReader {
         for range in ranges.into_iter().skip(1) {
             let current_end = current.end.unwrap_or(u64::MAX);
 
-            // Check if ranges overlap or are adjacent (within 64KB is considered adjacent for BGZF)
+            // Check if ranges overlap or are adjacent (within 64KB for BGZF)
             if range.start <= current_end + 65536 {
                 // Extend current range
                 current.end = match (current.end, range.end) {

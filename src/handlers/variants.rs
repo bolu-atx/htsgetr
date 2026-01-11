@@ -1,6 +1,7 @@
 use super::AppState;
 use crate::{
     Error, Result,
+    formats::VcfIndexReader,
     types::{
         DataClass, Format, HtsgetResponse, HtsgetResponseBody, Region, UrlEntry, VariantsPostBody,
         VariantsQuery,
@@ -74,29 +75,69 @@ async fn build_variants_response(
     regions: &[Region],
 ) -> Result<Json<HtsgetResponse>> {
     let mut urls = Vec::new();
+    let vcf_path = state.storage.file_path(id, format);
 
     match class {
         DataClass::Header => {
+            // Return only the header block
+            let header_range = VcfIndexReader::header_range(&vcf_path).await?;
             urls.push(UrlEntry {
-                url: state.storage.data_url(id, format, None),
+                url: state.storage.data_url(id, format, Some(header_range)),
                 headers: None,
                 class: Some(DataClass::Header),
             });
         }
         DataClass::Body => {
             if regions.is_empty() {
+                // No regions - return entire file
                 urls.push(UrlEntry {
                     url: state.storage.data_url(id, format, None),
                     headers: None,
                     class: None,
                 });
             } else {
-                // TODO: Use tabix/csi index for byte ranges
-                urls.push(UrlEntry {
-                    url: state.storage.data_url(id, format, None),
-                    headers: None,
-                    class: None,
-                });
+                // Check if index is available
+                let index_path = state.storage.index_path(id, format).await?;
+
+                if let Some(idx_path) = index_path {
+                    // Query tabix index for byte ranges
+                    let indexed =
+                        VcfIndexReader::query_ranges(&vcf_path, &idx_path, regions).await?;
+
+                    // Add header block first
+                    urls.push(UrlEntry {
+                        url: state
+                            .storage
+                            .data_url(id, format, Some(indexed.header_range)),
+                        headers: None,
+                        class: Some(DataClass::Header),
+                    });
+
+                    // Add data blocks
+                    if indexed.data_ranges.is_empty() {
+                        // Index query returned no specific ranges - return whole file body
+                        urls.push(UrlEntry {
+                            url: state.storage.data_url(id, format, None),
+                            headers: None,
+                            class: Some(DataClass::Body),
+                        });
+                    } else {
+                        for range in indexed.data_ranges {
+                            urls.push(UrlEntry {
+                                url: state.storage.data_url(id, format, Some(range)),
+                                headers: None,
+                                class: Some(DataClass::Body),
+                            });
+                        }
+                    }
+                } else {
+                    // No index available - return whole file
+                    urls.push(UrlEntry {
+                        url: state.storage.data_url(id, format, None),
+                        headers: None,
+                        class: None,
+                    });
+                }
             }
         }
     }
