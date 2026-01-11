@@ -72,14 +72,18 @@ impl Storage for LocalStorage {
 
     fn data_url(&self, id: &str, format: Format, range: Option<ByteRange>) -> String {
         let base = format!("{}/data/{}/{}", self.base_url, format_path(format), id);
+        let format_param = format!("format={:?}", format); // e.g., "format=Cram"
+
+        let mut params = vec![format_param];
+
         if let Some(r) = range {
-            match r.end {
-                Some(end) => format!("{}?start={}&end={}", base, r.start, end),
-                None => format!("{}?start={}", base, r.start),
+            params.push(format!("start={}", r.start));
+            if let Some(end) = r.end {
+                params.push(format!("end={}", end));
             }
-        } else {
-            base
         }
+
+        format!("{}?{}", base, params.join("&"))
     }
 
     async fn read_bytes(

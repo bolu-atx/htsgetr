@@ -1,7 +1,7 @@
 use super::AppState;
 use crate::{
     Error, Result,
-    formats::BamIndexReader,
+    formats::{BamIndexReader, CramIndexReader},
     types::{
         DataClass, Format, HtsgetResponse, HtsgetResponseBody, ReadsPostBody, ReadsQuery, Region,
         UrlEntry,
@@ -86,12 +86,16 @@ async fn build_reads_response(
     regions: &[Region],
 ) -> Result<Json<HtsgetResponse>> {
     let mut urls = Vec::new();
-    let bam_path = state.storage.file_path(id, format);
+    let file_path = state.storage.file_path(id, format);
 
     match class {
         DataClass::Header => {
-            // Return only the header block
-            let header_range = BamIndexReader::header_range(&bam_path).await?;
+            // Return only the header block - dispatch based on format
+            let header_range = match format {
+                Format::Bam => BamIndexReader::header_range(&file_path).await?,
+                Format::Cram => CramIndexReader::header_range(&file_path).await?,
+                _ => return Err(Error::UnsupportedFormat(format!("{:?}", format))),
+            };
             urls.push(UrlEntry {
                 url: state.storage.data_url(id, format, Some(header_range)),
                 headers: None,
@@ -111,13 +115,18 @@ async fn build_reads_response(
                 let index_path = state.storage.index_path(id, format).await?;
 
                 if let Some(idx_path) = index_path {
-                    // Read header for reference name mapping
-                    let header = BamIndexReader::read_header(&bam_path).await?;
-
-                    // Query index for byte ranges
-                    let indexed =
-                        BamIndexReader::query_ranges(&bam_path, &idx_path, regions, &header)
-                            .await?;
+                    // Query index for byte ranges - dispatch based on format
+                    let indexed = match format {
+                        Format::Bam => {
+                            let header = BamIndexReader::read_header(&file_path).await?;
+                            BamIndexReader::query_ranges(&file_path, &idx_path, regions, &header)
+                                .await?
+                        }
+                        Format::Cram => {
+                            CramIndexReader::query_ranges(&file_path, &idx_path, regions).await?
+                        }
+                        _ => return Err(Error::UnsupportedFormat(format!("{:?}", format))),
+                    };
 
                     // Add header block first
                     urls.push(UrlEntry {

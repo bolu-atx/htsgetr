@@ -1,2 +1,6 @@
 /target
 CLAUDE.md
+.DS_Store
+
+# Intermediate test files (cleaned up by generate-test-data.sh)
+tests/data/sample.sam

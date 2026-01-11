@@ -20,6 +20,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-action@stable
 
+      - name: Install htslib tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y samtools bcftools tabix
+
+      - name: Generate test data
+        run: ./scripts/generate-test-data.sh
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:

@@ -207,8 +207,8 @@ async fn test_post_reads_with_regions() {
 async fn test_variants_endpoint_not_found() {
     let server = create_test_server();
 
-    // We don't have a VCF.gz file, so this should return 404
-    let response = server.get("/variants/sample").await;
+    // Request a VCF file that doesn't exist
+    let response = server.get("/variants/nonexistent").await;
     response.assert_status_not_found();
 }
 
