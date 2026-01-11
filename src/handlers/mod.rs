@@ -6,7 +6,7 @@
 //! - [`get_variants`] / [`post_variants`] - `GET/POST /variants/:id`
 //! - [`get_sequences`] - `GET /sequences/:id` (extension)
 //! - [`get_data`] - `GET /data/:format/:id` (data serving)
-//! - [`service_info`] - `GET /service-info`
+//! - [`service_info()`] - `GET /service-info`
 //!
 //! # Protocol Flow
 //!
