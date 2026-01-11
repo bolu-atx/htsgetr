@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -74,40 +75,6 @@ jobs:
         run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
         continue-on-error: true
 
-  deploy-docs:
-    name: Deploy Docs to GitHub Pages
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build docs
-        run: cargo doc --no-deps
-
-      - name: Add redirect to crate docs
-        run: echo '<meta http-equiv="refresh" content="0; url=htsgetr/index.html">' > target/doc/index.html
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: target/doc
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
   build-python-wheels:
     name: Build Python wheels (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
@@ -129,6 +96,12 @@ jobs:
             target: x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       - name: Setup Python
         uses: actions/setup-python@v5
