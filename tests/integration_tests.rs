@@ -37,7 +37,12 @@ fn create_test_server() -> TestServer {
 
     let storage = Arc::new(LocalStorage::new(data_dir, base_url.clone()));
 
-    let state = AppState { storage, base_url };
+    let state = AppState {
+        storage,
+        base_url,
+        #[cfg(feature = "auth")]
+        url_signer: None,
+    };
 
     // Use centralized router definition
     let app = create_router(state);

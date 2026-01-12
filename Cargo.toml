@@ -19,6 +19,7 @@ default = ["s3", "http"]
 python = ["pyo3", "ureq"]
 s3 = ["aws-sdk-s3", "aws-config"]
 http = ["reqwest"]
+auth = ["jsonwebtoken", "hmac", "sha2", "moka", "reqwest"]
 
 [dependencies]
 # Web framework
@@ -80,8 +81,14 @@ ureq = { version = "2", optional = true }
 aws-sdk-s3 = { version = "1.65", optional = true }
 aws-config = { version = "1.5", features = ["behavior-version-latest"], optional = true }
 
-# HTTP storage (optional, default on)
-reqwest = { version = "0.12", features = ["stream"], optional = true }
+# HTTP storage (optional, default on) - auth feature needs json for JWKS
+reqwest = { version = "0.12", features = ["stream", "json"], optional = true }
+
+# Authentication (optional)
+jsonwebtoken = { version = "9", optional = true }
+hmac = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+moka = { version = "0.12", features = ["future"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"

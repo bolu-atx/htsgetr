@@ -7,9 +7,10 @@ A Rust implementation of the [htsget protocol](https://samtools.github.io/hts-sp
 - **htsget 1.3 compliant** - GET/POST endpoints for reads and variants
 - **Multiple formats** - BAM, CRAM, VCF, BCF via noodles
 - **Extensions** - FASTA/FASTQ support beyond the spec
+- **Multiple storage backends** - Local filesystem, S3, and HTTP/HTTPS
+- **JWT authentication** - Optional Bearer token auth with JWKS/static keys
 - **Python bindings** - PyO3 integration via maturin
 - **Async** - Built on tokio for high concurrency
-- **Pluggable storage** - Local filesystem, with S3/GCS planned
 
 ## Installation
 
@@ -67,7 +68,71 @@ htsgetr --data-dir /path/to/data --base-url https://example.com/htsget
 | `HTSGET_DATA_DIR` | `--data-dir` | `./data` | Directory containing genomic files |
 | `HTSGET_BASE_URL` | `--base-url` | auto | Base URL for ticket URLs |
 | `HTSGET_CORS` | `--cors` | `true` | Enable CORS |
+| `HTSGET_STORAGE` | `--storage` | `local` | Storage backend: `local`, `s3`, or `http` |
 | `RUST_LOG` | `--log-level` | `info` | Log level |
+
+#### S3 Storage
+
+```bash
+cargo build --features s3
+
+HTSGET_STORAGE=s3 \
+HTSGET_S3_BUCKET=my-genomics-bucket \
+HTSGET_S3_PREFIX=samples/ \
+htsgetr
+```
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `HTSGET_S3_BUCKET` | required | S3 bucket name |
+| `HTSGET_S3_REGION` | auto | AWS region (uses AWS_REGION if not set) |
+| `HTSGET_S3_PREFIX` | `""` | Key prefix for files |
+| `HTSGET_S3_ENDPOINT` | - | Custom endpoint (for MinIO, LocalStack) |
+| `HTSGET_PRESIGNED_URL_EXPIRY` | `3600` | Presigned URL TTL in seconds |
+| `HTSGET_CACHE_DIR` | `/tmp/htsgetr-cache` | Local cache for index files |
+
+#### HTTP Storage
+
+```bash
+cargo build --features http
+
+HTSGET_STORAGE=http \
+HTSGET_HTTP_BASE_URL=https://files.example.com/genomics/ \
+htsgetr
+```
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `HTSGET_HTTP_BASE_URL` | required | Base URL for data files |
+| `HTSGET_HTTP_INDEX_BASE_URL` | - | Base URL for index files (defaults to data URL) |
+
+#### Authentication
+
+Enable JWT/Bearer token authentication by building with the `auth` feature:
+
+```bash
+cargo build --features auth
+
+HTSGET_AUTH_ENABLED=true \
+HTSGET_AUTH_ISSUER=https://auth.example.com \
+htsgetr --features auth
+```
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `HTSGET_AUTH_ENABLED` | `false` | Enable authentication |
+| `HTSGET_AUTH_ISSUER` | - | JWT issuer URL (JWKS fetched from `{issuer}/.well-known/jwks.json`) |
+| `HTSGET_AUTH_AUDIENCE` | - | Expected `aud` claim |
+| `HTSGET_AUTH_JWKS_URL` | auto | Explicit JWKS URL (overrides issuer-derived URL) |
+| `HTSGET_AUTH_PUBLIC_KEY` | - | Static RSA/EC PEM public key (alternative to JWKS) |
+| `HTSGET_AUTH_PUBLIC_ENDPOINTS` | `/,/service-info` | Comma-separated paths that don't require auth |
+| `HTSGET_DATA_URL_SECRET` | generated | HMAC secret for signing data URLs |
+| `HTSGET_DATA_URL_EXPIRY` | `3600` | Signed data URL TTL in seconds |
+
+When auth is enabled:
+- Public endpoints (root, service-info) don't require authentication
+- All other endpoints require a valid `Authorization: Bearer <token>` header
+- Data URLs in tickets are HMAC-signed with expiry to prevent unauthorized access
 
 ### Data Directory Structure
 
@@ -186,11 +251,12 @@ ticket = client.reads("sample1", reference_name="chr1", start=0, end=1000000)
 - [x] Reads endpoint (BAM/CRAM)
 - [x] Variants endpoint (VCF/BCF)
 - [x] Sequences endpoint (FASTA/FASTQ extension)
-- [ ] Index-based byte range queries (BAI, TBI, CSI)
+- [x] Index-based byte range queries (BAI, TBI, CSI)
+- [x] S3 storage backend with pre-signed URLs
+- [x] HTTP/HTTPS storage backend
+- [x] JWT/Bearer token authentication
 - [ ] CRAM reference resolution
-- [ ] S3 storage backend with pre-signed URLs
 - [ ] GCS storage backend
-- [ ] OAuth2 bearer token authentication
 - [ ] Python bindings (full implementation)
 - [ ] Docker image
 

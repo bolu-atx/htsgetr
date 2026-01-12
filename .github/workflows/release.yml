@@ -28,20 +28,53 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Update version and create tag
+      - name: Update version and create PR
         id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ inputs.version }}"
           TAG="v$VERSION"
+          BRANCH="release/$TAG"
+
+          # Create release branch
+          git checkout -b "$BRANCH"
 
           # Update Cargo.toml version
           sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
 
-          # Commit and tag
+          # Commit and push branch
           git add Cargo.toml
           git commit -m "Release $TAG"
-          git tag "$TAG"
-          git push origin HEAD "$TAG"
+          git push origin "$BRANCH"
+
+          # Create PR and enable auto-merge
+          PR_URL=$(gh pr create --title "Release $TAG" --body "Automated version bump for $TAG release." --head "$BRANCH" --base master)
+          gh pr merge "$PR_URL" --auto --squash
+
+          # Wait for PR to be merged (poll every 10s, timeout after 5 min)
+          for i in {1..30}; do
+            STATE=$(gh pr view "$PR_URL" --json state --jq '.state')
+            if [[ "$STATE" == "MERGED" ]]; then
+              echo "PR merged successfully"
+              break
+            elif [[ "$STATE" == "CLOSED" ]]; then
+              echo "PR was closed without merging"
+              exit 1
+            fi
+            echo "Waiting for PR to be merged... (attempt $i/30)"
+            sleep 10
+          done
+
+          if [[ "$STATE" != "MERGED" ]]; then
+            echo "Timeout waiting for PR to merge"
+            exit 1
+          fi
+
+          # Fetch the merged commit and create tag
+          git fetch origin master
+          git tag "$TAG" origin/master
+          git push origin "$TAG"
 
           # Set outputs
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
