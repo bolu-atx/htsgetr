@@ -115,7 +115,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux || 'auto' }}
-          args: --release --out dist --features python
+          args: --release --out dist --features python ${{ matrix.target == 'aarch64-unknown-linux-gnu' && '-i python3.11' || '' }}
           docker-options: ${{ matrix.target == 'aarch64-unknown-linux-gnu' && '-e CARGO_NET_GIT_FETCH_WITH_CLI=true' || '' }}
 
       - name: Upload wheels
