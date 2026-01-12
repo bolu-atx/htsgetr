@@ -26,10 +26,16 @@ mod local;
 #[cfg(feature = "s3")]
 mod s3;
 
+#[cfg(feature = "http")]
+mod http;
+
 pub use local::LocalStorage;
 
 #[cfg(feature = "s3")]
 pub use s3::S3Storage;
+
+#[cfg(feature = "http")]
+pub use http::HttpStorage;
 
 use crate::{Result, types::Format};
 use async_trait::async_trait;

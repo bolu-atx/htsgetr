@@ -25,7 +25,7 @@ fn htsgetr(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 /// htsget server that can be started from Python
 ///
-/// Supports both local filesystem and S3 storage backends.
+/// Supports local filesystem, S3, and HTTP storage backends.
 #[cfg(feature = "python")]
 #[pyclass]
 pub struct HtsgetServer {
@@ -38,6 +38,10 @@ pub struct HtsgetServer {
     s3_region: Option<String>,
     s3_prefix: String,
     s3_endpoint: Option<String>,
+    // HTTP storage options
+    http_base_url: Option<String>,
+    http_index_base_url: Option<String>,
+    // Common options
     cache_dir: PathBuf,
     presigned_url_expiry: u64,
 }
@@ -57,6 +61,8 @@ impl HtsgetServer {
             s3_region: None,
             s3_prefix: String::new(),
             s3_endpoint: None,
+            http_base_url: None,
+            http_index_base_url: None,
             cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
             presigned_url_expiry: 3600,
         }
@@ -83,8 +89,35 @@ impl HtsgetServer {
             s3_region: region,
             s3_prefix: prefix,
             s3_endpoint: endpoint,
+            http_base_url: None,
+            http_index_base_url: None,
             cache_dir: PathBuf::from(cache_dir),
             presigned_url_expiry,
+        }
+    }
+
+    /// Create a new htsget server with HTTP storage
+    #[staticmethod]
+    #[pyo3(signature = (base_url, host="0.0.0.0".to_string(), port=8080, index_base_url=None, cache_dir="/tmp/htsgetr-cache".to_string()))]
+    fn with_http(
+        base_url: String,
+        host: String,
+        port: u16,
+        index_base_url: Option<String>,
+        cache_dir: String,
+    ) -> Self {
+        Self {
+            host,
+            port,
+            data_dir: None,
+            s3_bucket: None,
+            s3_region: None,
+            s3_prefix: String::new(),
+            s3_endpoint: None,
+            http_base_url: Some(base_url),
+            http_index_base_url: index_base_url,
+            cache_dir: PathBuf::from(cache_dir),
+            presigned_url_expiry: 3600,
         }
     }
 
@@ -108,6 +141,8 @@ impl HtsgetServer {
         let s3_region = self.s3_region.clone();
         let s3_prefix = self.s3_prefix.clone();
         let s3_endpoint = self.s3_endpoint.clone();
+        let http_base_url = self.http_base_url.clone();
+        let http_index_base_url = self.http_index_base_url.clone();
         let cache_dir = self.cache_dir.clone();
         let presigned_url_expiry = self.presigned_url_expiry;
 
@@ -145,12 +180,34 @@ impl HtsgetServer {
                         "S3 storage requires the 's3' feature to be enabled",
                     ));
                 }
+            } else if let Some(base_url_http) = http_base_url {
+                #[cfg(feature = "http")]
+                {
+                    use crate::storage::HttpStorage;
+                    tracing::info!("Using HTTP storage backend: base_url={}", base_url_http);
+                    Arc::new(
+                        HttpStorage::new(base_url_http, http_index_base_url, cache_dir)
+                            .await
+                            .map_err(|e| {
+                                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                                    "Failed to create HTTP storage: {}",
+                                    e
+                                ))
+                            })?,
+                    )
+                }
+                #[cfg(not(feature = "http"))]
+                {
+                    return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                        "HTTP storage requires the 'http' feature to be enabled",
+                    ));
+                }
             } else if let Some(data_dir) = data_dir {
                 tracing::info!("Using local storage backend: {:?}", data_dir);
                 Arc::new(LocalStorage::new(data_dir, base_url.clone()))
             } else {
                 return Err(pyo3::exceptions::PyRuntimeError::new_err(
-                    "Either data_dir or s3_bucket must be specified",
+                    "Either data_dir, s3_bucket, or http_base_url must be specified",
                 ));
             };
 
@@ -185,6 +242,11 @@ impl HtsgetServer {
     /// Check if this server uses S3 storage
     fn is_s3(&self) -> bool {
         self.s3_bucket.is_some()
+    }
+
+    /// Check if this server uses HTTP storage
+    fn is_http(&self) -> bool {
+        self.http_base_url.is_some()
     }
 }
 

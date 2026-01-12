@@ -36,6 +36,7 @@ pub enum StorageType {
     #[default]
     Local,
     S3,
+    Http,
 }
 
 impl FromStr for StorageType {
@@ -45,8 +46,9 @@ impl FromStr for StorageType {
         match s.to_lowercase().as_str() {
             "local" => Ok(StorageType::Local),
             "s3" => Ok(StorageType::S3),
+            "http" | "https" => Ok(StorageType::Http),
             _ => Err(format!(
-                "unknown storage type: {} (expected 'local' or 's3')",
+                "unknown storage type: {} (expected 'local', 's3', or 'http')",
                 s
             )),
         }
@@ -58,6 +60,7 @@ impl std::fmt::Display for StorageType {
         match self {
             StorageType::Local => write!(f, "local"),
             StorageType::S3 => write!(f, "s3"),
+            StorageType::Http => write!(f, "http"),
         }
     }
 }
@@ -121,6 +124,14 @@ pub struct Config {
     /// Presigned URL expiration in seconds (used with S3 storage)
     #[arg(long, env = "HTSGET_PRESIGNED_URL_EXPIRY", default_value = "3600")]
     pub presigned_url_expiry: u64,
+
+    /// HTTP base URL for data files (required when storage=http)
+    #[arg(long, env = "HTSGET_HTTP_BASE_URL")]
+    pub http_base_url: Option<String>,
+
+    /// HTTP base URL for index files (optional, defaults to http_base_url)
+    #[arg(long, env = "HTSGET_HTTP_INDEX_BASE_URL")]
+    pub http_index_base_url: Option<String>,
 }
 
 impl Config {
@@ -139,9 +150,8 @@ impl Config {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_effective_base_url_default() {
-        let config = Config {
+    fn make_test_config() -> Config {
+        Config {
             host: "0.0.0.0".to_string(),
             port: 8080,
             base_url: None,
@@ -156,49 +166,29 @@ mod tests {
             s3_endpoint: None,
             cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
             presigned_url_expiry: 3600,
-        };
+            http_base_url: None,
+            http_index_base_url: None,
+        }
+    }
+
+    #[test]
+    fn test_effective_base_url_default() {
+        let config = make_test_config();
         assert_eq!(config.effective_base_url(), "http://0.0.0.0:8080");
     }
 
     #[test]
     fn test_effective_base_url_custom() {
-        let config = Config {
-            host: "0.0.0.0".to_string(),
-            port: 8080,
-            base_url: Some("https://example.com/htsget".to_string()),
-            data_dir: PathBuf::from("./data"),
-            cors: true,
-            log_level: "info".to_string(),
-            max_payload: 10485760,
-            storage: StorageType::Local,
-            s3_bucket: None,
-            s3_region: None,
-            s3_prefix: String::new(),
-            s3_endpoint: None,
-            cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
-            presigned_url_expiry: 3600,
-        };
+        let mut config = make_test_config();
+        config.base_url = Some("https://example.com/htsget".to_string());
         assert_eq!(config.effective_base_url(), "https://example.com/htsget");
     }
 
     #[test]
     fn test_effective_base_url_custom_port() {
-        let config = Config {
-            host: "localhost".to_string(),
-            port: 3000,
-            base_url: None,
-            data_dir: PathBuf::from("./data"),
-            cors: true,
-            log_level: "info".to_string(),
-            max_payload: 10485760,
-            storage: StorageType::Local,
-            s3_bucket: None,
-            s3_region: None,
-            s3_prefix: String::new(),
-            s3_endpoint: None,
-            cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
-            presigned_url_expiry: 3600,
-        };
+        let mut config = make_test_config();
+        config.host = "localhost".to_string();
+        config.port = 3000;
         assert_eq!(config.effective_base_url(), "http://localhost:3000");
     }
 
@@ -208,6 +198,9 @@ mod tests {
         assert_eq!(StorageType::from_str("LOCAL").unwrap(), StorageType::Local);
         assert_eq!(StorageType::from_str("s3").unwrap(), StorageType::S3);
         assert_eq!(StorageType::from_str("S3").unwrap(), StorageType::S3);
+        assert_eq!(StorageType::from_str("http").unwrap(), StorageType::Http);
+        assert_eq!(StorageType::from_str("HTTP").unwrap(), StorageType::Http);
+        assert_eq!(StorageType::from_str("https").unwrap(), StorageType::Http);
         assert!(StorageType::from_str("invalid").is_err());
     }
 }

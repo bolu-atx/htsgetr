@@ -2,20 +2,63 @@ name: Release
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0 or 0.2.0-beta.1)'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  bump-version:
+    name: Bump Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update version and create tag
+        id: version
+        run: |
+          VERSION="${{ inputs.version }}"
+          TAG="v$VERSION"
+
+          # Update Cargo.toml version
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+
+          # Commit and tag
+          git add Cargo.toml
+          git commit -m "Release $TAG"
+          git tag "$TAG"
+          git push origin HEAD "$TAG"
+
+          # Set outputs
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
+    needs: bump-version
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.tag }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -38,12 +81,13 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: build-linux
-    if: github.event_name != 'workflow_dispatch'
+    needs: [bump-version, build-linux]
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.tag }}
 
       - name: Download Linux binary
         uses: actions/download-artifact@v4
@@ -54,20 +98,30 @@ jobs:
       - name: Rename binary
         run: mv artifacts/htsgetr artifacts/htsgetr-linux-x86_64
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref, '-') }}
-          files: artifacts/htsgetr-linux-x86_64
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.bump-version.outputs.tag }}"
+          PRERELEASE=""
+          if [[ "${{ needs.bump-version.outputs.prerelease }}" == "true" ]]; then
+            PRERELEASE="--prerelease"
+          fi
+
+          gh release create "$TAG" \
+            --generate-notes \
+            $PRERELEASE \
+            artifacts/htsgetr-linux-x86_64
 
   publish-crate:
     name: Publish to crates.io
     runs-on: ubuntu-latest
-    needs: create-release
-    if: github.event_name != 'workflow_dispatch' && !contains(github.ref, '-')
+    needs: [bump-version, create-release]
+    if: needs.bump-version.outputs.prerelease == 'false'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.tag }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -79,6 +133,7 @@ jobs:
   build-python-wheels:
     name: Build Python wheels (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    needs: bump-version
     strategy:
       fail-fast: false
       matrix:
@@ -97,6 +152,8 @@ jobs:
             target: x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.tag }}
 
       - name: Set up QEMU
         if: runner.os == 'Linux' && matrix.target == 'aarch64-unknown-linux-gnu'
@@ -127,8 +184,11 @@ jobs:
   build-python-sdist:
     name: Build Python source distribution
     runs-on: ubuntu-latest
+    needs: bump-version
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.tag }}
 
       - name: Build sdist
         uses: PyO3/maturin-action@v1
@@ -145,8 +205,8 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: [build-python-wheels, build-python-sdist]
-    if: github.event_name != 'workflow_dispatch' && !contains(github.ref, '-')
+    needs: [bump-version, build-python-wheels, build-python-sdist]
+    if: needs.bump-version.outputs.prerelease == 'false'
     environment:
       name: pypi
       url: https://pypi.org/project/htsgetr/

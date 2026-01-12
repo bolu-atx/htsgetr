@@ -13,6 +13,9 @@ use htsgetr::{
 #[cfg(feature = "s3")]
 use htsgetr::storage::S3Storage;
 
+#[cfg(feature = "http")]
+use htsgetr::storage::HttpStorage;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
@@ -60,6 +63,29 @@ async fn main() -> anyhow::Result<()> {
         StorageType::S3 => {
             anyhow::bail!(
                 "S3 storage requires the 's3' feature to be enabled. Rebuild with: cargo build --features s3"
+            )
+        }
+        #[cfg(feature = "http")]
+        StorageType::Http => {
+            let base_url = config.http_base_url.clone().ok_or_else(|| {
+                anyhow::anyhow!("HTSGET_HTTP_BASE_URL is required for HTTP storage")
+            })?;
+
+            tracing::info!("Using HTTP storage backend: base_url={}", base_url);
+
+            Arc::new(
+                HttpStorage::new(
+                    base_url,
+                    config.http_index_base_url.clone(),
+                    config.cache_dir.clone(),
+                )
+                .await?,
+            )
+        }
+        #[cfg(not(feature = "http"))]
+        StorageType::Http => {
+            anyhow::bail!(
+                "HTTP storage requires the 'http' feature to be enabled. Rebuild with: cargo build --features http"
             )
         }
     };
