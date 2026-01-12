@@ -35,6 +35,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"  # Strip leading 'v' if present
           TAG="v$VERSION"
           BRANCH="release/$TAG"
 
