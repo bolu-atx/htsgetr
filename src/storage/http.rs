@@ -31,7 +31,7 @@ impl HttpStorage {
     ///
     /// # Arguments
     ///
-    /// * `base_url` - Base URL for data files (e.g., "https://example.com/data/")
+    /// * `base_url` - Base URL for data files (e.g., `https://example.com/data/`)
     /// * `index_base_url` - Optional separate base URL for index files
     /// * `cache_dir` - Local directory for caching index files
     pub async fn new(
