@@ -15,9 +15,10 @@ name = "htsgetr"
 path = "src/main.rs"
 
 [features]
-default = ["s3"]
+default = ["s3", "http"]
 python = ["pyo3", "ureq"]
 s3 = ["aws-sdk-s3", "aws-config"]
+http = ["reqwest"]
 
 [dependencies]
 # Web framework
@@ -78,6 +79,9 @@ ureq = { version = "2", optional = true }
 # S3 storage (optional, default on)
 aws-sdk-s3 = { version = "1.65", optional = true }
 aws-config = { version = "1.5", features = ["behavior-version-latest"], optional = true }
+
+# HTTP storage (optional, default on)
+reqwest = { version = "0.12", features = ["stream"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
