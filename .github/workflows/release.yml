@@ -39,6 +39,9 @@ jobs:
           TAG="v$VERSION"
           BRANCH="release/$TAG"
 
+          # Clean up any existing release branch from previous attempts
+          git push origin --delete "$BRANCH" 2>/dev/null || true
+
           # Create release branch
           git checkout -b "$BRANCH"
 
@@ -47,7 +50,7 @@ jobs:
 
           # Commit and push branch
           git add Cargo.toml
-          git commit -m "Release $TAG"
+          git commit -m "Release $TAG [skip ci]"
           git push origin "$BRANCH"
 
           # Create PR and enable auto-merge
