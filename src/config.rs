@@ -138,7 +138,7 @@ pub struct Config {
     #[arg(long, env = "HTSGET_AUTH_ENABLED", default_value = "false")]
     pub auth_enabled: bool,
 
-    /// JWT issuer URL (e.g., "https://auth.example.com")
+    /// JWT issuer URL (e.g., `https://auth.example.com`)
     #[arg(long, env = "HTSGET_AUTH_ISSUER")]
     pub auth_issuer: Option<String>,
 
