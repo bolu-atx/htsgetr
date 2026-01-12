@@ -15,7 +15,8 @@
 //! - **Multiple formats** - BAM, CRAM, VCF, BCF via [noodles](https://github.com/zaeleus/noodles)
 //! - **Extensions** - FASTA/FASTQ support beyond the spec
 //! - **Async** - Built on [tokio](https://tokio.rs) and [axum](https://github.com/tokio-rs/axum)
-//! - **Pluggable storage** - Trait-based storage abstraction
+//! - **Pluggable storage** - Local filesystem and S3 backends
+//! - **S3 support** - Presigned URLs, index caching, custom endpoints (MinIO/LocalStack)
 //!
 //! ## Quick Start
 //!
@@ -51,6 +52,10 @@
 //!
 //! This allows servers to optimize data access patterns and support various
 //! storage backends (local, S3, GCS) with presigned URLs.
+//!
+//! ## Roadmap
+//!
+#![doc = include_str!("../docs/roadmap.md")]
 
 pub mod config;
 pub mod error;
