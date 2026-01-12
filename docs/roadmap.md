@@ -25,12 +25,14 @@ Core htsget protocol features needed for full compliance.
 
 Enable serving data from cloud storage backends.
 
-### S3 Storage Backend
-- Add `S3Storage` implementation of `Storage` trait
-- Generate presigned URLs for data tickets
-- Support AWS credentials via environment/IAM
-- Add `--storage s3://bucket` CLI option
-- Dependencies: `aws-sdk-s3`
+### S3 Storage Backend ✓
+- ✓ Add `S3Storage` implementation of `Storage` trait
+- ✓ Generate presigned URLs for data tickets
+- ✓ Support AWS credentials via environment/IAM
+- ✓ Add `HTSGET_STORAGE=s3` and `HTSGET_S3_BUCKET` config
+- ✓ Support custom endpoints for MinIO/LocalStack
+- ✓ Local caching of index files
+- Dependencies: `aws-sdk-s3`, `aws-config`
 
 ### HTTP/URL Storage Backend
 - Add `UrlStorage` implementation for remote HTTP files

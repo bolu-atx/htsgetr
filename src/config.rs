@@ -28,6 +28,39 @@
 
 use clap::Parser;
 use std::path::PathBuf;
+use std::str::FromStr;
+
+/// Storage backend type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StorageType {
+    #[default]
+    Local,
+    S3,
+}
+
+impl FromStr for StorageType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "local" => Ok(StorageType::Local),
+            "s3" => Ok(StorageType::S3),
+            _ => Err(format!(
+                "unknown storage type: {} (expected 'local' or 's3')",
+                s
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for StorageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StorageType::Local => write!(f, "local"),
+            StorageType::S3 => write!(f, "s3"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Parser)]
 #[command(name = "htsgetr")]
@@ -60,6 +93,34 @@ pub struct Config {
     /// Maximum payload size in bytes
     #[arg(long, env = "HTSGET_MAX_PAYLOAD", default_value = "10485760")]
     pub max_payload: usize,
+
+    /// Storage backend type: "local" or "s3"
+    #[arg(long, env = "HTSGET_STORAGE", default_value = "local")]
+    pub storage: StorageType,
+
+    /// S3 bucket name (required when storage=s3)
+    #[arg(long, env = "HTSGET_S3_BUCKET")]
+    pub s3_bucket: Option<String>,
+
+    /// S3 region (uses AWS_REGION/AWS_DEFAULT_REGION if not set)
+    #[arg(long, env = "HTSGET_S3_REGION")]
+    pub s3_region: Option<String>,
+
+    /// S3 key prefix (e.g., "genomics/samples/")
+    #[arg(long, env = "HTSGET_S3_PREFIX", default_value = "")]
+    pub s3_prefix: String,
+
+    /// S3 endpoint URL (for S3-compatible services like MinIO, LocalStack)
+    #[arg(long, env = "HTSGET_S3_ENDPOINT")]
+    pub s3_endpoint: Option<String>,
+
+    /// Local cache directory for index files (used with S3 storage)
+    #[arg(long, env = "HTSGET_CACHE_DIR", default_value = "/tmp/htsgetr-cache")]
+    pub cache_dir: PathBuf,
+
+    /// Presigned URL expiration in seconds (used with S3 storage)
+    #[arg(long, env = "HTSGET_PRESIGNED_URL_EXPIRY", default_value = "3600")]
+    pub presigned_url_expiry: u64,
 }
 
 impl Config {
@@ -88,6 +149,13 @@ mod tests {
             cors: true,
             log_level: "info".to_string(),
             max_payload: 10485760,
+            storage: StorageType::Local,
+            s3_bucket: None,
+            s3_region: None,
+            s3_prefix: String::new(),
+            s3_endpoint: None,
+            cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
+            presigned_url_expiry: 3600,
         };
         assert_eq!(config.effective_base_url(), "http://0.0.0.0:8080");
     }
@@ -102,6 +170,13 @@ mod tests {
             cors: true,
             log_level: "info".to_string(),
             max_payload: 10485760,
+            storage: StorageType::Local,
+            s3_bucket: None,
+            s3_region: None,
+            s3_prefix: String::new(),
+            s3_endpoint: None,
+            cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
+            presigned_url_expiry: 3600,
         };
         assert_eq!(config.effective_base_url(), "https://example.com/htsget");
     }
@@ -116,7 +191,23 @@ mod tests {
             cors: true,
             log_level: "info".to_string(),
             max_payload: 10485760,
+            storage: StorageType::Local,
+            s3_bucket: None,
+            s3_region: None,
+            s3_prefix: String::new(),
+            s3_endpoint: None,
+            cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
+            presigned_url_expiry: 3600,
         };
         assert_eq!(config.effective_base_url(), "http://localhost:3000");
+    }
+
+    #[test]
+    fn test_storage_type_parsing() {
+        assert_eq!(StorageType::from_str("local").unwrap(), StorageType::Local);
+        assert_eq!(StorageType::from_str("LOCAL").unwrap(), StorageType::Local);
+        assert_eq!(StorageType::from_str("s3").unwrap(), StorageType::S3);
+        assert_eq!(StorageType::from_str("S3").unwrap(), StorageType::S3);
+        assert!(StorageType::from_str("invalid").is_err());
     }
 }
