@@ -45,7 +45,10 @@ impl FromStr for StorageType {
         match s.to_lowercase().as_str() {
             "local" => Ok(StorageType::Local),
             "s3" => Ok(StorageType::S3),
-            _ => Err(format!("unknown storage type: {} (expected 'local' or 's3')", s)),
+            _ => Err(format!(
+                "unknown storage type: {} (expected 'local' or 's3')",
+                s
+            )),
         }
     }
 }

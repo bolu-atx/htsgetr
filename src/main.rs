@@ -58,7 +58,9 @@ async fn main() -> anyhow::Result<()> {
         }
         #[cfg(not(feature = "s3"))]
         StorageType::S3 => {
-            anyhow::bail!("S3 storage requires the 's3' feature to be enabled. Rebuild with: cargo build --features s3")
+            anyhow::bail!(
+                "S3 storage requires the 's3' feature to be enabled. Rebuild with: cargo build --features s3"
+            )
         }
     };
 

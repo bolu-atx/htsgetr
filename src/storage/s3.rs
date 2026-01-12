@@ -12,8 +12,8 @@
 use super::{ByteRange, FileInfo, Storage};
 use crate::{Error, Result, types::Format};
 use async_trait::async_trait;
-use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client;
+use aws_sdk_s3::presigning::PresigningConfig;
 use bytes::Bytes;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -190,11 +190,7 @@ impl S3Storage {
     }
 
     /// Generate a presigned URL for an S3 object.
-    async fn generate_presigned_url(
-        &self,
-        key: &str,
-        range: Option<&ByteRange>,
-    ) -> Result<String> {
+    async fn generate_presigned_url(&self, key: &str, range: Option<&ByteRange>) -> Result<String> {
         let presign_config = PresigningConfig::builder()
             .expires_in(self.presign_expiry)
             .build()
