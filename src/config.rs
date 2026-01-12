@@ -132,6 +132,43 @@ pub struct Config {
     /// HTTP base URL for index files (optional, defaults to http_base_url)
     #[arg(long, env = "HTSGET_HTTP_INDEX_BASE_URL")]
     pub http_index_base_url: Option<String>,
+
+    // Authentication options (requires `auth` feature)
+    /// Enable authentication
+    #[arg(long, env = "HTSGET_AUTH_ENABLED", default_value = "false")]
+    pub auth_enabled: bool,
+
+    /// JWT issuer URL (e.g., "https://auth.example.com")
+    #[arg(long, env = "HTSGET_AUTH_ISSUER")]
+    pub auth_issuer: Option<String>,
+
+    /// JWT audience claim to validate against
+    #[arg(long, env = "HTSGET_AUTH_AUDIENCE")]
+    pub auth_audience: Option<String>,
+
+    /// JWKS URL for fetching public keys (defaults to {issuer}/.well-known/jwks.json)
+    #[arg(long, env = "HTSGET_AUTH_JWKS_URL")]
+    pub auth_jwks_url: Option<String>,
+
+    /// Static RSA/EC public key in PEM format (alternative to JWKS)
+    #[arg(long, env = "HTSGET_AUTH_PUBLIC_KEY")]
+    pub auth_public_key: Option<String>,
+
+    /// Endpoints that don't require auth (comma-separated paths)
+    #[arg(
+        long,
+        env = "HTSGET_AUTH_PUBLIC_ENDPOINTS",
+        default_value = "/,/service-info"
+    )]
+    pub auth_public_endpoints: String,
+
+    /// Secret key for signing data URLs (generated if not provided)
+    #[arg(long, env = "HTSGET_DATA_URL_SECRET")]
+    pub data_url_secret: Option<String>,
+
+    /// Data URL signature expiry in seconds
+    #[arg(long, env = "HTSGET_DATA_URL_EXPIRY", default_value = "3600")]
+    pub data_url_expiry: u64,
 }
 
 impl Config {
@@ -168,6 +205,14 @@ mod tests {
             presigned_url_expiry: 3600,
             http_base_url: None,
             http_index_base_url: None,
+            auth_enabled: false,
+            auth_issuer: None,
+            auth_audience: None,
+            auth_jwks_url: None,
+            auth_public_key: None,
+            auth_public_endpoints: "/,/service-info".to_string(),
+            data_url_secret: None,
+            data_url_expiry: 3600,
         }
     }
 

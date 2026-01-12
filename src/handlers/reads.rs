@@ -97,7 +97,7 @@ async fn build_reads_response(
                 _ => return Err(Error::UnsupportedFormat(format!("{:?}", format))),
             };
             urls.push(UrlEntry {
-                url: state.storage.data_url(id, format, Some(header_range)),
+                url: state.sign_data_url(state.storage.data_url(id, format, Some(header_range))),
                 headers: None,
                 class: Some(DataClass::Header),
             });
@@ -106,7 +106,7 @@ async fn build_reads_response(
             if regions.is_empty() {
                 // No regions - return entire file
                 urls.push(UrlEntry {
-                    url: state.storage.data_url(id, format, None),
+                    url: state.sign_data_url(state.storage.data_url(id, format, None)),
                     headers: None,
                     class: None,
                 });
@@ -130,9 +130,11 @@ async fn build_reads_response(
 
                     // Add header block first
                     urls.push(UrlEntry {
-                        url: state
-                            .storage
-                            .data_url(id, format, Some(indexed.header_range)),
+                        url: state.sign_data_url(state.storage.data_url(
+                            id,
+                            format,
+                            Some(indexed.header_range),
+                        )),
                         headers: None,
                         class: Some(DataClass::Header),
                     });
@@ -142,14 +144,18 @@ async fn build_reads_response(
                         // Index query returned no specific ranges - return whole file body
                         // This shouldn't happen if index was properly queried
                         urls.push(UrlEntry {
-                            url: state.storage.data_url(id, format, None),
+                            url: state.sign_data_url(state.storage.data_url(id, format, None)),
                             headers: None,
                             class: Some(DataClass::Body),
                         });
                     } else {
                         for range in indexed.data_ranges {
                             urls.push(UrlEntry {
-                                url: state.storage.data_url(id, format, Some(range)),
+                                url: state.sign_data_url(state.storage.data_url(
+                                    id,
+                                    format,
+                                    Some(range),
+                                )),
                                 headers: None,
                                 class: Some(DataClass::Body),
                             });
@@ -158,7 +164,7 @@ async fn build_reads_response(
                 } else {
                     // No index available - return whole file
                     urls.push(UrlEntry {
-                        url: state.storage.data_url(id, format, None),
+                        url: state.sign_data_url(state.storage.data_url(id, format, None)),
                         headers: None,
                         class: None,
                     });

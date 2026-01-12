@@ -42,11 +42,34 @@ use crate::storage::Storage;
 use axum::{Router, routing::get};
 use std::sync::Arc;
 
+#[cfg(feature = "auth")]
+use crate::auth::UrlSigner;
+
 /// Shared application state
 #[derive(Clone)]
 pub struct AppState {
     pub storage: Arc<dyn Storage>,
     pub base_url: String,
+    /// URL signer for data endpoints (when auth is enabled)
+    #[cfg(feature = "auth")]
+    pub url_signer: Option<UrlSigner>,
+}
+
+impl AppState {
+    /// Sign a data URL if authentication is enabled.
+    #[cfg(feature = "auth")]
+    pub fn sign_data_url(&self, url: String) -> String {
+        match &self.url_signer {
+            Some(signer) => signer.sign_url(&url),
+            None => url,
+        }
+    }
+
+    /// Sign a data URL (no-op when auth feature is disabled).
+    #[cfg(not(feature = "auth"))]
+    pub fn sign_data_url(&self, url: String) -> String {
+        url
+    }
 }
 
 /// Create the htsget router with all endpoints configured

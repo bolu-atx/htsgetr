@@ -16,6 +16,9 @@ use htsgetr::storage::S3Storage;
 #[cfg(feature = "http")]
 use htsgetr::storage::HttpStorage;
 
+#[cfg(feature = "auth")]
+use htsgetr::auth::{AuthConfig, UrlSigner, auth_middleware};
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
@@ -90,13 +93,48 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    // Create URL signer if auth is enabled
+    #[cfg(feature = "auth")]
+    let url_signer = if config.auth_enabled {
+        let secret = config
+            .data_url_secret
+            .as_ref()
+            .map(|s| s.as_bytes().to_vec())
+            .unwrap_or_else(|| {
+                tracing::info!("Generating random data URL signing secret");
+                UrlSigner::generate_secret()
+            });
+        Some(UrlSigner::new(secret, config.data_url_expiry))
+    } else {
+        None
+    };
+
     let state = AppState {
         storage,
         base_url: config.effective_base_url(),
+        #[cfg(feature = "auth")]
+        url_signer: url_signer.clone(),
     };
 
     // Build router
-    let app = create_router(state).layer(TraceLayer::new_for_http());
+    let app = create_router(state);
+
+    // Add auth middleware if enabled
+    #[cfg(feature = "auth")]
+    let app = if config.auth_enabled {
+        let auth_config = Arc::new(build_auth_config(&config, url_signer)?);
+        // Extension must be added before middleware so middleware can extract it
+        app.layer(axum::Extension(auth_config))
+            .layer(axum::middleware::from_fn(
+                |req: axum::extract::Request, next: axum::middleware::Next| async move {
+                    auth_middleware(req, next).await
+                },
+            ))
+    } else {
+        app
+    };
+
+    let app = app.layer(TraceLayer::new_for_http());
 
     let app = if config.cors {
         app.layer(CorsLayer::permissive())
@@ -112,4 +150,50 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// Build AuthConfig from Config settings.
+#[cfg(feature = "auth")]
+fn build_auth_config(config: &Config, url_signer: Option<UrlSigner>) -> anyhow::Result<AuthConfig> {
+    use htsgetr::auth::{KeyProvider, StaticKeyProvider, jwks::JwksKeyProvider};
+    use std::collections::HashSet;
+
+    // Determine key provider
+    let key_provider: Arc<dyn KeyProvider> = if let Some(ref pem) = config.auth_public_key {
+        // Static PEM key
+        tracing::info!("Using static public key for JWT validation");
+        Arc::new(StaticKeyProvider::from_rsa_pem(pem.as_bytes())?)
+    } else if let Some(ref jwks_url) = config.auth_jwks_url {
+        // Explicit JWKS URL
+        tracing::info!("Using JWKS endpoint: {}", jwks_url);
+        Arc::new(JwksKeyProvider::new(jwks_url.clone()))
+    } else if let Some(ref issuer) = config.auth_issuer {
+        // Derive JWKS URL from issuer
+        tracing::info!("Using JWKS from issuer: {}", issuer);
+        Arc::new(JwksKeyProvider::from_issuer(issuer))
+    } else {
+        anyhow::bail!(
+            "Auth enabled but no key source configured. Set HTSGET_AUTH_ISSUER, \
+             HTSGET_AUTH_JWKS_URL, or HTSGET_AUTH_PUBLIC_KEY"
+        );
+    };
+
+    // Parse public endpoints
+    let public_paths: HashSet<String> = config
+        .auth_public_endpoints
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    tracing::info!("Public endpoints (no auth required): {:?}", public_paths);
+
+    Ok(AuthConfig {
+        enabled: true,
+        key_provider,
+        issuer: config.auth_issuer.clone(),
+        audience: config.auth_audience.clone(),
+        public_paths,
+        url_signer,
+    })
 }

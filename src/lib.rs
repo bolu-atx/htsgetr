@@ -187,5 +187,8 @@ pub mod types;
 #[cfg(feature = "python")]
 pub mod python;
 
+#[cfg(feature = "auth")]
+pub mod auth;
+
 pub use config::Config;
 pub use error::{Error, Result};

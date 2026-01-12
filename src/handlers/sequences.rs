@@ -40,7 +40,7 @@ pub async fn get_sequences(
     // For FASTA with .fai index, we could support region queries
     // For now, return the whole file
     let urls = vec![UrlEntry {
-        url: state.storage.data_url(&id, format, None),
+        url: state.sign_data_url(state.storage.data_url(&id, format, None)),
         headers: None,
         class: None,
     }];
