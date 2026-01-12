@@ -11,6 +11,9 @@ use std::path::PathBuf;
 #[cfg(feature = "python")]
 use std::sync::Arc;
 
+#[cfg(feature = "python")]
+use crate::storage::Storage;
+
 /// Python module for htsgetr
 #[cfg(feature = "python")]
 #[pymodule]
@@ -21,24 +24,67 @@ fn htsgetr(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// htsget server that can be started from Python
+///
+/// Supports both local filesystem and S3 storage backends.
 #[cfg(feature = "python")]
 #[pyclass]
 pub struct HtsgetServer {
     host: String,
     port: u16,
-    data_dir: PathBuf,
+    // Local storage options
+    data_dir: Option<PathBuf>,
+    // S3 storage options
+    s3_bucket: Option<String>,
+    s3_region: Option<String>,
+    s3_prefix: String,
+    s3_endpoint: Option<String>,
+    cache_dir: PathBuf,
+    presigned_url_expiry: u64,
 }
 
 #[cfg(feature = "python")]
 #[pymethods]
 impl HtsgetServer {
+    /// Create a new htsget server with local storage
     #[new]
     #[pyo3(signature = (data_dir, host="0.0.0.0".to_string(), port=8080))]
     fn new(data_dir: String, host: String, port: u16) -> Self {
         Self {
             host,
             port,
-            data_dir: PathBuf::from(data_dir),
+            data_dir: Some(PathBuf::from(data_dir)),
+            s3_bucket: None,
+            s3_region: None,
+            s3_prefix: String::new(),
+            s3_endpoint: None,
+            cache_dir: PathBuf::from("/tmp/htsgetr-cache"),
+            presigned_url_expiry: 3600,
+        }
+    }
+
+    /// Create a new htsget server with S3 storage
+    #[staticmethod]
+    #[pyo3(signature = (bucket, host="0.0.0.0".to_string(), port=8080, region=None, prefix="".to_string(), endpoint=None, cache_dir="/tmp/htsgetr-cache".to_string(), presigned_url_expiry=3600))]
+    fn with_s3(
+        bucket: String,
+        host: String,
+        port: u16,
+        region: Option<String>,
+        prefix: String,
+        endpoint: Option<String>,
+        cache_dir: String,
+        presigned_url_expiry: u64,
+    ) -> Self {
+        Self {
+            host,
+            port,
+            data_dir: None,
+            s3_bucket: Some(bucket),
+            s3_region: region,
+            s3_prefix: prefix,
+            s3_endpoint: endpoint,
+            cache_dir: PathBuf::from(cache_dir),
+            presigned_url_expiry,
         }
     }
 
@@ -54,15 +100,59 @@ impl HtsgetServer {
 
         let host = self.host.clone();
         let port = self.port;
-        let data_dir = self.data_dir.clone();
         let base_url = format!("http://{}:{}", host, port);
+
+        // Clone config for async block
+        let data_dir = self.data_dir.clone();
+        let s3_bucket = self.s3_bucket.clone();
+        let s3_region = self.s3_region.clone();
+        let s3_prefix = self.s3_prefix.clone();
+        let s3_endpoint = self.s3_endpoint.clone();
+        let cache_dir = self.cache_dir.clone();
+        let presigned_url_expiry = self.presigned_url_expiry;
 
         rt.block_on(async move {
             // Initialize tracing (basic)
             let _ = tracing_subscriber::fmt::try_init();
 
-            // Create storage backend
-            let storage = Arc::new(LocalStorage::new(data_dir.clone(), base_url.clone()));
+            // Create storage backend based on configuration
+            let storage: Arc<dyn Storage> = if let Some(bucket) = s3_bucket {
+                #[cfg(feature = "s3")]
+                {
+                    use crate::storage::S3Storage;
+                    tracing::info!("Using S3 storage backend: bucket={}", bucket);
+                    Arc::new(
+                        S3Storage::new(
+                            bucket,
+                            s3_prefix,
+                            cache_dir,
+                            presigned_url_expiry,
+                            s3_region,
+                            s3_endpoint,
+                        )
+                        .await
+                        .map_err(|e| {
+                            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                                "Failed to create S3 storage: {}",
+                                e
+                            ))
+                        })?,
+                    )
+                }
+                #[cfg(not(feature = "s3"))]
+                {
+                    return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                        "S3 storage requires the 's3' feature to be enabled",
+                    ));
+                }
+            } else if let Some(data_dir) = data_dir {
+                tracing::info!("Using local storage backend: {:?}", data_dir);
+                Arc::new(LocalStorage::new(data_dir, base_url.clone()))
+            } else {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                    "Either data_dir or s3_bucket must be specified",
+                ));
+            };
 
             let state = AppState {
                 storage,
@@ -76,7 +166,6 @@ impl HtsgetServer {
 
             let addr = format!("{}:{}", host, port);
             tracing::info!("Starting htsgetr server on {}", addr);
-            tracing::info!("Data directory: {:?}", data_dir);
 
             let listener = tokio::net::TcpListener::bind(&addr)
                 .await
@@ -91,6 +180,11 @@ impl HtsgetServer {
     /// Get the server URL
     fn url(&self) -> String {
         format!("http://{}:{}", self.host, self.port)
+    }
+
+    /// Check if this server uses S3 storage
+    fn is_s3(&self) -> bool {
+        self.s3_bucket.is_some()
     }
 }
 
