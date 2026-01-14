@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
@@ -45,11 +48,12 @@ jobs:
           # Create release branch
           git checkout -b "$BRANCH"
 
-          # Update Cargo.toml version
+          # Update Cargo.toml version and regenerate Cargo.lock
           sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          cargo update --workspace
 
           # Commit and push branch
-          git add Cargo.toml
+          git add Cargo.toml Cargo.lock
           git commit -m "Release $TAG [skip ci]"
           git push origin "$BRANCH"
 
