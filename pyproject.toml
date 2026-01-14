@@ -31,6 +31,7 @@ Repository = "https://github.com/bolu-atx/htsgetr"
 features = ["python"]
 python-source = "python"
 module-name = "htsgetr._htsgetr"
+version-source = "cargo"
 
 [project.optional-dependencies]
 dev = [
