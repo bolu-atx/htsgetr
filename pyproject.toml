@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "htsgetr"
-version = "0.1.0"
+dynamic = ["version"]
 description = "htsget protocol server implementation in Rust with Python bindings"
 readme = "README.md"
 license = { text = "MIT" }
