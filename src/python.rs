@@ -329,7 +329,7 @@ impl HtsgetClient {
             pyo3::exceptions::PyRuntimeError::new_err(format!("HTTP request failed: {}", e))
         })?;
 
-        response.into_string().map_err(|e| {
+        response.into_body().read_to_string().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to read response: {}", e))
         })
     }

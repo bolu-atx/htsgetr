@@ -74,8 +74,8 @@ async-trait = "0.1"
 # Python bindings (optional)
 pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
 
-# HTTP client for Python bindings (optional)
-ureq = { version = "2", optional = true }
+# HTTP client for Python bindings (optional) - v3 uses rustls by default, avoids OpenSSL cross-compile issues
+ureq = { version = "3", optional = true }
 
 # S3 storage (optional, default on)
 aws-sdk-s3 = { version = "1.65", optional = true }
