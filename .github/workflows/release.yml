@@ -53,28 +53,9 @@ jobs:
           git commit -m "Release $TAG [skip ci]"
           git push origin "$BRANCH"
 
-          # Create PR and enable auto-merge
+          # Create PR and merge immediately
           PR_URL=$(gh pr create --title "Release $TAG" --body "Automated version bump for $TAG release." --head "$BRANCH" --base master)
-          gh pr merge "$PR_URL" --auto --squash
-
-          # Wait for PR to be merged (poll every 10s, timeout after 5 min)
-          for i in {1..30}; do
-            STATE=$(gh pr view "$PR_URL" --json state --jq '.state')
-            if [[ "$STATE" == "MERGED" ]]; then
-              echo "PR merged successfully"
-              break
-            elif [[ "$STATE" == "CLOSED" ]]; then
-              echo "PR was closed without merging"
-              exit 1
-            fi
-            echo "Waiting for PR to be merged... (attempt $i/30)"
-            sleep 10
-          done
-
-          if [[ "$STATE" != "MERGED" ]]; then
-            echo "Timeout waiting for PR to merge"
-            exit 1
-          fi
+          gh pr merge "$PR_URL" --squash --delete-branch
 
           # Fetch the merged commit and create tag
           git fetch origin master
