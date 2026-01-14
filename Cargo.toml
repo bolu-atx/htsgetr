@@ -82,7 +82,8 @@ aws-sdk-s3 = { version = "1.65", optional = true }
 aws-config = { version = "1.5", features = ["behavior-version-latest"], optional = true }
 
 # HTTP storage (optional, default on) - auth feature needs json for JWKS
-reqwest = { version = "0.12", features = ["stream", "json"], optional = true }
+# Use rustls-tls to avoid OpenSSL cross-compile issues in maturin builds
+reqwest = { version = "0.12", default-features = false, features = ["stream", "json", "rustls-tls"], optional = true }
 
 # Authentication (optional)
 jsonwebtoken = { version = "9", optional = true }
