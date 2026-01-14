@@ -32,7 +32,7 @@ jobs:
       - name: Update version and create PR
         id: version
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ inputs.version }}"
           VERSION="${VERSION#v}"  # Strip leading 'v' if present
