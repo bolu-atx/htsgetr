@@ -72,7 +72,7 @@ impl Storage for LocalStorage {
 
     fn data_url(&self, id: &str, format: Format, range: Option<ByteRange>) -> String {
         let base = format!("{}/data/{}/{}", self.base_url, format_path(format), id);
-        let format_param = format!("format={:?}", format); // e.g., "format=Cram"
+        let format_param = format!("format={}", format.as_str());
 
         let mut params = vec![format_param];
 
