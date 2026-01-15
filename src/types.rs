@@ -60,6 +60,18 @@ pub enum Format {
 }
 
 impl Format {
+    /// Returns the format as an uppercase string (for URL query params)
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Format::Bam => "BAM",
+            Format::Cram => "CRAM",
+            Format::Vcf => "VCF",
+            Format::Bcf => "BCF",
+            Format::Fasta => "FASTA",
+            Format::Fastq => "FASTQ",
+        }
+    }
+
     pub fn content_type(&self) -> &'static str {
         match self {
             Format::Bam => "application/vnd.ga4gh.bam",
